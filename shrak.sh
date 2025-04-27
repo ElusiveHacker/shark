@@ -70,7 +70,6 @@ enum4linux_function() {
             echo "$tool is not installed. Skipping enumeration for port $port."
         else
             echo "Running $tool $host"
-            echo "DEBUG 3 Inner"
             "$tool" "$host"
         fi
     fi
@@ -247,9 +246,7 @@ if [ -n "$live_hosts" ]; then
                                 nmap -p "$port" --script="$scripts" "$live_host" | sed 's/^/    /'
                             fi
                             echo "Additional TCP Tool Output:- "
-                            echo "DEBUG1"
                             enum4linux_function "$live_host" "$port" "$proto" "$name" | sed 's/^/    /'
-                            echo "DEBUG2"
                         fi
                     done
                 done
@@ -283,6 +280,8 @@ if [ -n "$live_hosts" ]; then
                             fi
                             echo "Additional UDP Tool Output:- "
                             snmpwalk_function "$live_host" "$port" "$proto" "$name" | sed 's/^/    /'
+                            smbmap_function "$live_host" "$port" "$proto" "$name" | sed 's/^/    /'
+                            smtp_function "$live_host" "$port" "$proto" "$name" | sed 's/^/    /'
                         fi
                     done
                 done
