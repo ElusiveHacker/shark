@@ -39,18 +39,6 @@ Install missing tools with:
 sudo apt install nmap snmp snmp-mibs-downloader
 pip install impacket
 ```
-Service | Port | Protocol | Additional Plugins / Tools
-FTP | 21 | TCP | ftp-anon
-SSH | 22 | TCP | ssh2-enum-algos
-Telnet | 23 | TCP | telnet-ntlm-info
-SMB | 445 | TCP | smb-enum-shares, smb-enum-users, enum4linux-ng, smbmap
-SNMP | 161 | UDP | snmp-sysdescr, snmpwalk
-LDAP | 389 | TCP | ldap-rootdse, Kerberoasting
-Kerberos | 88 | TCP | Kerberoasting
-NFS | 2049 | UDP | nfs-ls, nfs-showmount, nfs-statfs
-SQL Databases | Various | TCP | ms-sql-info, mysql-enum, pgsql-brute
-HTTP/HTTPS | 80/443/5985 | TCP | http-headers, ssl-enum-ciphers
-And many more... |  |  | 
 
 Notes ⚠️
 
