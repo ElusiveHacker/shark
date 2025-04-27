@@ -247,6 +247,8 @@ if [ -n "$live_hosts" ]; then
                             fi
                             echo "Additional TCP Tool Output:- "
                             enum4linux_function "$live_host" "$port" "$proto" "$name" | sed 's/^/    /'
+                            smbmap_function "$live_host" "$port" "$proto" "$name" | sed 's/^/    /'
+                            smtp_function "$live_host" "$port" "$proto" "$name" | sed 's/^/    /'
                         fi
                     done
                 done
@@ -280,8 +282,6 @@ if [ -n "$live_hosts" ]; then
                             fi
                             echo "Additional UDP Tool Output:- "
                             snmpwalk_function "$live_host" "$port" "$proto" "$name" | sed 's/^/    /'
-                            smbmap_function "$live_host" "$port" "$proto" "$name" | sed 's/^/    /'
-                            smtp_function "$live_host" "$port" "$proto" "$name" | sed 's/^/    /'
                         fi
                     done
                 done
