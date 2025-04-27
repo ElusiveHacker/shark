@@ -30,6 +30,7 @@ A Bash script that automates scanning, service enumeration, and basic exploitati
 - `snmpwalk`
 - `smtp-user-enum`
 - `impacket` package (`GetUserSPNs.py` script)
+
 - Optional: `sed`, `grep`, `cut` (should already be available on most systems)
 
 Install missing tools with:
@@ -37,3 +38,12 @@ Install missing tools with:
 ```bash
 sudo apt install nmap snmp snmp-mibs-downloader
 pip install impacket
+```
+
+Notes ⚠️
+
+    ⚡ Speed: The script uses --min-rate=1000 for faster scans. Tune this if you get network instability.
+
+    🛡️ Ethics: Only run this script on networks you own or have explicit permission to scan!
+
+    📂 Custom Services: You can extend or modify the SERVICES array at the top of the script.
