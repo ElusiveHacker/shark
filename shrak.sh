@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # Define the SERVICES array
-# Format: "service_name:port:protocol:plugins" or "port:protocol:plugins"
+# Format can be "service_name:port:protocol:plugins" or "port:protocol:plugins"
+# Plugins are comma-separated if multiple are specified
 SERVICES=(
     "23:TCP:telnet-ntlm-info"
     "22:TCP:ssh2-enum-algos"
@@ -23,13 +24,13 @@ SERVICES=(
     "512:TCP:rexec-brute"
     "5900:TCP:vnc-brute,vnc-title,realvnc-auth-bypass"
     "161:UDP:snmp-sysdescr"
-    "445:TCP:smb-enum-shares,smb-enum-users"
-    "88:TCP:fingerprint-strings"
+    "445:TCP:smb-vuln-ms06-025,smb-vuln-ms07-029,smb-vuln-ms08-067,smb-vuln-ms10-054,smb-vuln-ms10-061,smb-vuln-ms17-010,smb2-capabilities"
 )
 
 # Function to validate input as a single IP or CIDR
 validate_input() {
     local input="$1"
+    # Check if it's a single IP (e.g., 192.168.1.1)
     if [[ $input =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
         IFS='.' read -r -a octets <<< "$input"
         for octet in "${octets[@]}"; do
@@ -38,6 +39,7 @@ validate_input() {
             fi
         done
         return 0
+    # Check if it's a CIDR (e.g., 192.168.1.0/24)
     elif [[ $input =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$ ]]; then
         local ip="${input%/*}"
         local mask="${input#*/}"
@@ -56,12 +58,7 @@ validate_input() {
     fi
 }
 
-# Function to strip ANSI escape codes
-strip_ansi() {
-    sed 's/\x1B\[[0-9;]*[JKmsu]//g'
-}
-
-# Enum4linux-ng function for AD enumeration
+# Enum4linux function scanning for ADs and usernames.
 enum4linux_function() {
     local host="$1"
     local port="$2"
@@ -72,13 +69,15 @@ enum4linux_function() {
         if ! command -v "$tool" &> /dev/null; then
             echo "$tool is not installed. Skipping enumeration for port $port."
         else
-            echo "Running $tool -a $host"
-            "$tool" -a "$host" 2>> "$OUTPUT_DIR/error.log" | strip_ansi
+            echo "Running $tool $host"
+            echo "DEBUG 3 Inner"
+            "$tool" "$host"
         fi
     fi
+    # Add more conditions here for other ports/protocols as needed
 }
 
-# SMBMap function for SMB share enumeration
+# SMBMap function scanning for SMBshares.
 smbmap_function() {
     local host="$1"
     local port="$2"
@@ -90,12 +89,13 @@ smbmap_function() {
             echo "$tool is not installed. Skipping enumeration for port $port."
         else
             echo "Running $tool -H $host"
-            "$tool" -H "$host" 2>> "$OUTPUT_DIR/error.log" | strip_ansi
+            "$tool" -H "$host"
         fi
     fi
+    # Add more conditions here for other ports/protocols as needed
 }
 
-# SNMPwalk function for SNMP enumeration
+# snmpwalk function scanning for port 161..
 snmpwalk_function() {
     local host="$1"
     local port="$2"
@@ -107,12 +107,13 @@ snmpwalk_function() {
             echo "$tool is not installed. Skipping enumeration for port $port."
         else
             echo "Running $tool -v1 -c public $host"
-            "$tool" -v1 -c public "$host" 2>> "$OUTPUT_DIR/error.log" | strip_ansi
+            "$tool" -v1 -c public "$host"
         fi
     fi
+    # Add more conditions here for other ports/protocols as needed
 }
 
-# SMTP function for SMTP user enumeration
+# smtp function scanning for port 25..
 smtp_function() {
     local host="$1"
     local port="$2"
@@ -124,54 +125,54 @@ smtp_function() {
             echo "$tool is not installed. Skipping enumeration for port $port."
         else
             echo "Running $tool -M VRFY -U users.txt -t $host"
-            "$tool" -M VRFY -U users.txt -t "$host" 2>> "$OUTPUT_DIR/error.log" | strip_ansi
+            "$tool"  -M VRFY -U users.txt -t "$host"
         fi
     fi
+    # Add more conditions here for other ports/protocols as needed
 }
 
-# Kerberoasting function for AD service account enumeration
-kerberoast_function() {
+# Template function to replicate.
+template_function() {
     local host="$1"
     local port="$2"
     local proto="$3"
     local name="$4"
-    if { [ "$port" = "88" ] || [ "$port" = "389" ]; } && [ "$proto" = "TCP" ]; then
-        local tool="GetUserSPNs.py"
+    if [ "$port" = "445" ] && [ "$proto" = "TCP" ]; then
+        local tool="enum4linux"
         if ! command -v "$tool" &> /dev/null; then
-            echo "$tool is not installed. Skipping Kerberoasting for port $port."
+            echo "$tool is not installed. Skipping enumeration for port $port."
         else
-            read -p "Enter AD username (e.g., user@domain.com): " ad_user
-            read -sp "Enter AD password: " ad_pass
-            echo
-            echo "Running $tool for $ad_user on $host"
-            "$tool" -dc-ip "$host" -request "$ad_user:$ad_pass" -outputfile "$OUTPUT_DIR/kerberoast_$host.txt" 2>> "$OUTPUT_DIR/error.log" | strip_ansi
-            if [ -s "$OUTPUT_DIR/kerberoast_$host.txt" ]; then
-                echo "Kerberoasting output saved to $OUTPUT_DIR/kerberoast_$host.txt"
-            else
-                echo "No SPNs found or Kerberoasting failed."
-            fi
+            echo "Running $tool -a $host"
+            "$tool" -a "$host"
         fi
     fi
+    # Add more conditions here for other ports/protocols as needed
 }
 
 # Main script
-read -p "Enter IP or CIDR (192.168.1.1 or 192.168.1.0/24): " input
-OUTPUT_DIR="scan_output_$(date +%F_%H-%M-%S)"
-mkdir -p "$OUTPUT_DIR"
 
+# Prompt user for input
+read -p "Enter IP or CIDR (192.168.1.1 or 192.168.1.0/24): " input
+
+# Validate the input
 if ! validate_input "$input"; then
     echo "Invalid IP or CIDR format."
     exit 1
 fi
 
-nmap -sn "$input" -oG - > "$OUTPUT_DIR/live_hosts_ping_scan.txt"
-live_hosts=$(grep "Status: Up" "$OUTPUT_DIR/live_hosts_ping_scan.txt" | cut -d' ' -f2)
-dead_hosts=$(grep "Status: Down" "$OUTPUT_DIR/live_hosts_ping_scan.txt" | cut -d' ' -f2)
+# Perform ping scan to identify live hosts
+nmap -sn "$input" -oG - > live_hosts_ping_scan.txt
 
+# Extract live and dead hosts from ping scan results
+live_hosts=$(grep "Status: Up" live_hosts_ping_scan.txt | cut -d' ' -f2) 
+dead_hosts=$(grep "Status: Down" live_hosts_ping_scan.txt | cut -d' ' -f2)
+
+# Extract TCP and UDP ports from SERVICES array
 declare -a tcp_ports
 declare -a udp_ports
 for service in "${SERVICES[@]}"; do
     parts=(${service//:/ })
+    # Handle both 4-part and 3-part service formats
     if [ "${#parts[@]}" = 4 ]; then
         port="${parts[1]}"
         proto="${parts[2]}"
@@ -189,15 +190,18 @@ for service in "${SERVICES[@]}"; do
     fi
 done
 
+# Create comma-separated port lists for Nmap
 tcp_ports_str=$(printf "%s," "${tcp_ports[@]}" | sed 's/,$//')
 udp_ports_str=$(printf "%s," "${udp_ports[@]}" | sed 's/,$//')
 
-report_file="$OUTPUT_DIR/report.txt"
+# Initialize report file
+report_file="report.txt"
 > "$report_file"
 echo "Scan Report for $input" >> "$report_file"
 echo "Generated on: $(date)" >> "$report_file"
 echo "----------------------------------------" >> "$report_file"
 
+# Record dead hosts
 echo "Dead Hosts:" >> "$report_file"
 if [ -n "$dead_hosts" ]; then
     for dead_host in $dead_hosts; do
@@ -208,15 +212,17 @@ else
 fi
 echo "----------------------------------------" >> "$report_file"
 
+# Process live hosts
 echo "Live Hosts:" >> "$report_file"
 if [ -n "$live_hosts" ]; then
     for live_host in $live_hosts; do
-        echo "Scanning host: $live_host..." >&2
+        echo "Scanning host: $live_host..." >&2  # Progress message to stderr
         {
-            echo "Host: $live_host"
+            echo "Host::::: $live_host:"
+            # Scan TCP ports if any are specified
             if [ -n "$tcp_ports_str" ]; then
-                nmap -sSV -Pn -n --min-rate=1000 -p "$tcp_ports_str" -oG - "$live_host" > "$OUTPUT_DIR/tcp_scan_$live_host.txt"
-                open_tcp_ports=$(grep "Ports:" "$OUTPUT_DIR/tcp_scan_$live_host.txt" | grep -oP '\d+/open/tcp' | cut -d'/' -f1)
+                nmap -sSV -Pn -n --min-rate=1000 -p "$tcp_ports_str" -oG - "$live_host" > tcp_scan.txt
+                open_tcp_ports=$(grep "Ports:" tcp_scan.txt | grep -oP '\d+/open/tcp' | cut -d'/' -f1)
                 for open_port in $open_tcp_ports; do
                     for service in "${SERVICES[@]}"; do
                         parts=(${service//:/ })
@@ -238,28 +244,20 @@ if [ -n "$live_hosts" ]; then
                             echo "  Service: $name"
                             if [ -n "$scripts" ]; then
                                 echo "  Nmap Plugins Output ($scripts):"
-                                nmap -p "$port" --script="$scripts" "$live_host" | strip_ansi | sed 's/^/    /'
+                                nmap -p "$port" --script="$scripts" "$live_host" | sed 's/^/    /'
                             fi
-                            echo "  Additional TCP Tool Output:"
-                            case "$port" in
-                                "445")
-                                    enum4linux_function "$live_host" "$port" "$proto" "$name" | sed 's/^/    /'
-                                    smbmap_function "$live_host" "$port" "$proto" "$name" | sed 's/^/    /'
-                                    ;;
-                                "88"|"389")
-                                    kerberoast_function "$live_host" "$port" "$proto" "$name" | sed 's/^/    /'
-                                    ;;
-                                "25")
-                                    smtp_function "$live_host" "$port" "$proto" "$name" | sed 's/^/    /'
-                                    ;;
-                            esac
+                            echo "Additional TCP Tool Output:- "
+                            echo "DEBUG1"
+                            enum4linux_function "$live_host" "$port" "$proto" "$name" | sed 's/^/    /'
+                            echo "DEBUG2"
                         fi
                     done
                 done
             fi
+            # Scan UDP ports if any are specified
             if [ -n "$udp_ports_str" ]; then
-                nmap -sUV -Pn -n --min-rate=1000 -p "$udp_ports_str" -oG - "$live_host" > "$OUTPUT_DIR/udp_scan_$live_host.txt"
-                open_udp_ports=$(grep "Ports:" "$OUTPUT_DIR/udp_scan_$live_host.txt" | grep -oP '\d+/open/udp' | cut -d'/' -f1)
+                nmap -sUV -Pn -n --min-rate=1000 -p "$udp_ports_str" -oG - "$live_host" > udp_scan.txt
+                open_udp_ports=$(grep "Ports:" udp_scan.txt | grep -oP '\d+/open/udp' | cut -d'/' -f1)
                 for open_port in $open_udp_ports; do
                     for service in "${SERVICES[@]}"; do
                         parts=(${service//:/ })
@@ -281,14 +279,10 @@ if [ -n "$live_hosts" ]; then
                             echo "  Service: $name"
                             if [ -n "$scripts" ]; then
                                 echo "  Nmap Plugins Output ($scripts):"
-                                nmap -p "$port" --script="$scripts" "$live_host" | strip_ansi | sed 's/^/    /'
+                                nmap -p "$port" --script="$scripts" "$live_host" | sed 's/^/    /'
                             fi
-                            echo "  Additional UDP Tool Output:"
-                            case "$port" in
-                                "161")
-                                    snmpwalk_function "$live_host" "$port" "$proto" "$name" | sed 's/^/    /'
-                                    ;;
-                            esac
+                            echo "Additional UDP Tool Output:- "
+                            snmpwalk_function "$live_host" "$port" "$proto" "$name" | sed 's/^/    /'
                         fi
                     done
                 done
